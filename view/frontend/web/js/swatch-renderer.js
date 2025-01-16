@@ -5,10 +5,11 @@ define([
     'mage/smart-keyboard-handler',
     'mage/translate',
     'priceUtils',
+    'SCP_all_option_clickable',
     'jquery-ui-modules/widget',
     'jquery/jquery.parsequery',
     'mage/validation/validation'
-], function ($, _, mageTemplate, keyboardHandler, $t, priceUtils) {
+], function ($, _, mageTemplate, keyboardHandler, $t, priceUtils, allOptionClickable) {
     'use strict';
     /* jQuery load event */
     $(document).ready(function () {
@@ -255,6 +256,11 @@ define([
             // Use ajax to get image data
             useAjax: false,
 
+            // Calculate Product is Enable
+            calculateNewProduct: false,
+
+            forceToCalculateNewProduct: false,
+
             /**
              * Defines the mechanism of how images of a gallery should be
              * updated when user switches between configurations of a product.
@@ -302,7 +308,7 @@ define([
 
         _UpdatePreOrder: function () {
             var page_url = $("#url").val();
-            if(ajaxcall == 1 && page_url != " "){
+            if (ajaxcall === 1 && page_url !== undefined && page_url.trim() !== "") {
                 $.ajax({
                     type: "POST",
                     url: page_url,
@@ -799,13 +805,14 @@ define([
                 $this.addClass('selected');
                 $widget._toggleCheckedAttributes($this, $wrapper);
             }
-            var currentURL = window.location.href;
+            var currentUrl = new URL(window.location.href);
+            var currentBaseUrl = currentUrl.origin + currentUrl.pathname;
             var simpleProductId = '';
             if (!localStorage.getItem('processed')) {
                 var selectedOptionId = '', selectedLabel = '';
                 if (typeof this.options.productUrls !== 'undefined') {
                     $.each(this.options.productUrls, function (productId, productUrl) {
-                        if (productUrl == currentURL) {
+                        if (productUrl == currentBaseUrl) {
                             simpleProductId = productId;
                             return true;
                         }
@@ -843,8 +850,9 @@ define([
             }
 
             $widget._Rebuild();
+            $widget._calculateNewProduct($widget, $this);
 
-            if ($priceBox.data('mage-priceBox')) {
+            if ($priceBox.data('priceBox')) {
                 this.options.tierPriceTemplate = $(this.options.tierPriceTemplateSelector).html();
                 $widget._UpdatePrice();
             }
@@ -866,7 +874,12 @@ define([
                         if (config.customAttributes[simpleProductId].name && config.customAttributes[simpleProductId].name.value !== 'undefined') {
                             title = config.customAttributes[simpleProductId].name.value;
                         }
-                        window.history.replaceState(null, title, url);
+                        var queryString = window.location.search;
+                        if (queryString) {
+                            window.history.replaceState(null, title, url+queryString);
+                        } else {
+                            window.history.replaceState(null, title, url);
+                        }
                     }
                 });
             }
@@ -887,7 +900,7 @@ define([
                 // $widget._loadMedia();
                 $input.trigger('change');
                 localStorage.setItem('processed', true);
-                if ($priceBox.data('mage-priceBox')) {
+                if ($priceBox.data('priceBox')) {
                     $widget._UpdatePrice();
                 }
             }, 1000);
@@ -964,6 +977,7 @@ define([
             }
 
             $widget._Rebuild();
+            $widget._calculateNewProduct($widget, $this);
             $widget._UpdatePrice();
 
 
@@ -990,13 +1004,51 @@ define([
                         if (config.customAttributes[simpleProductId].name.value !== 'undefined') {
                             title = config.customAttributes[simpleProductId].name.value;
                         }
-                        window.history.replaceState(null, title, url);
+                        var queryString = window.location.search;
+                        if (queryString) {
+                            window.history.replaceState(null, title, url+queryString);
+                        } else {
+                            window.history.replaceState(null, title, url);
+                        }
                     }
                 });
             }
 
             $widget._loadMedia();
             $input.trigger('change');
+        },
+
+        /**
+         * Calculates the new product based on selected options.
+         * This function determines the currently selected product based on the selected options
+         * and updates the product options dynamically if necessary.
+         *
+         * @param {Object} $widget - The widget instance containing the product data and options.
+         * @param {Object} $selectedElement - The currently selected element triggering the calculation.
+         */
+        _calculateNewProduct: function ($widget, $this) {
+            var allOptionsSelectable = $widget.options.scpCombinationsData && $widget.options.scpCombinationsData.all_options_selectable !== undefined ? $widget.options.scpCombinationsData.all_options_selectable : {};
+            var allOptionsSelectableLength = Object.keys(allOptionsSelectable).length;
+            if (allOptionsSelectableLength == 0) {
+                return;
+            }
+            setTimeout(function () {$widget.option.calculateNewProduct = true;}, 1000);
+            setTimeout(function () {$widget.option.forceToCalculateNewProduct = true;}, 10000);
+            var isSelectableAttribute = false;
+            Object.keys(allOptionsSelectable).forEach(function (attributeCode) {
+                var value = allOptionsSelectable[attributeCode];
+                var $element = $this.closest('.swatch-attribute[data-attribute-code="' + attributeCode + '"][data-attribute-id="' + value + '"]');
+                if ($element.length > 0) {
+                    isSelectableAttribute = true;
+                }
+            });
+            if ($widget.option.calculateNewProduct == true && isSelectableAttribute == true) {
+                var allSwatchesCount = $('[data-role="swatch-options"] .swatch-attribute[data-attribute-code]').length;
+                var allSelectedSwatchesCount = $('[data-role="swatch-options"] .swatch-attribute[data-attribute-code][data-option-selected]').length;
+                if ((allSwatchesCount > 0 && allSwatchesCount == allSelectedSwatchesCount) || $widget.option.forceToCalculateNewProduct == true) {
+                    allOptionClickable._calculateNewProduct($widget, $this);
+                }
+            }
         },
 
         /**
@@ -1032,19 +1084,23 @@ define([
             var $widget = this,
                 controls = $widget.element.find('.' + $widget.options.classes.attributeClass + '[data-attribute-id]'),
                 selected = controls.filter('[data-option-selected]');
+            var combinations = $widget.options.scpCombinationsData && $widget.options.scpCombinationsData.combinations !== undefined ? $widget.options.scpCombinationsData.combinations : {},
+                unusedOptions = $widget.options.scpCombinationsData && $widget.options.scpCombinationsData.unused_options !== undefined ? $widget.options.scpCombinationsData.unused_options : {},
+                allOptionsSelectable = $widget.options.scpCombinationsData && $widget.options.scpCombinationsData.all_options_selectable !== undefined ? $widget.options.scpCombinationsData.all_options_selectable : {};
 
             // Enable all options
             $widget._Rewind(controls);
 
-            // done if nothing selected
+            // Exit early if nothing is selected
             if (selected.length <= 0) {
                 return;
             }
 
-            // Disable not available options
+            // Iterate through each control and manage the disabling of options
             controls.each(function () {
                 var $this = $(this),
                     id = $this.data('attribute-id'),
+                    code = $this.data('attribute-code'),
                     products = $widget._CalcProducts(id);
 
                 if (selected.length === 1 && selected.first().data('attribute-id') === id) {
@@ -1054,6 +1110,13 @@ define([
                 $this.find('[data-option-id]').each(function () {
                     var $element = $(this),
                         option = $element.data('option-id');
+
+                    if (typeof unusedOptions[code] != 'undefined' && typeof unusedOptions[code][option] != 'undefined') {
+                        $element.hide();
+                    }
+                    if (typeof allOptionsSelectable[code] != 'undefined') {
+                        return;
+                    }
 
                     if (!$widget.optionsMap.hasOwnProperty(id) || !$widget.optionsMap[id].hasOwnProperty(option) ||
                         $element.hasClass('selected') ||
@@ -1499,14 +1562,15 @@ define([
          * @private
          */
         _EmulateSelected: function (selectedAttributes) {
-            var currentURL = window.location.href;
+            var currentUrl = new URL(window.location.href);
+            var currentBaseUrl = currentUrl.origin + currentUrl.pathname;
             var simpleProductId = '';
             var selectedOptionId = new Array();
             var selectedLabel = '';
             var k = 0, j = 0;
             if (typeof this.options.productUrls !== 'undefined') {
                 $.each(this.options.productUrls, function (productId, productUrl) {
-                    if (productUrl == currentURL) {
+                    if (productUrl == currentBaseUrl) {
                         simpleProductId = productId;
                         return true;
                     }
@@ -1557,25 +1621,50 @@ define([
             if ($widget.options.customAttributes && typeof $widget.options.customAttributes[simpleProductId] !== 'undefined') {
                 $.each($widget.options.customAttributes[simpleProductId], function (attributeCode, data) {
                     var $block = $(data.class);
-                    if (typeof data.replace != 'undefined' && data.replace) {
-                        if (data.value == '') {
-                            $block.remove();
-                        }
+                    var attributesWithWait = ['attributes', 'description'];
 
-                        if ($block.length > 0) {
-                            $block.replaceWith(data.value);
+                    function updateBlockContent() {
+                        if (typeof data.replace !== 'undefined' && data.replace) {
+                            if (data.value === '') {
+                                $block.remove();
+                            }
+
+                            if ($block.length > 0) {
+                                $block.replaceWith(data.value);
+                            } else {
+                                $(data.container).html(data.value);
+                            }
                         } else {
-                            $(data.container).html(data.value);
+                            if ($block.length > 0) {
+                                // if($block.selector.includes('meta')){
+                                //     $($block.selector).attr('content', data.value);
+                                // }
+                                // else{
+                                    $block.html(data.value);
+                                // }
+                            }
+                        }
+                    }
+
+                    if (attributesWithWait.includes(attributeCode)) {
+                        if ($block.length > 0) {
+                            updateBlockContent();
+                        } else {
+                            var attempts = 0;
+                            var interval = setInterval(function () {
+                                attempts += 1;
+                                $block = $(data.class);
+                                if ($block.length > 0) {
+                                    updateBlockContent();
+                                    clearInterval(interval);
+                                }
+                                if (attempts >= 6) {
+                                    clearInterval(interval);
+                                }
+                            }, 500);
                         }
                     } else {
-                        if ($block.length > 0) {
-                            // if($block.selector.includes('meta')){
-                            //     $($block.selector).attr('content', data.value);
-                            // }
-                            // else{
-                                $block.html(data.value);
-                            // }
-                        }
+                        updateBlockContent();
                     }
                 });
             }
@@ -1658,10 +1747,11 @@ define([
                 return;
             }
 
-            var currentUrl = window.location.href;
+            var currentUrl = new URL(window.location.href);
+            var currentBaseUrl = currentUrl.origin + currentUrl.pathname;
             var simpleProductId = null;
             $.each(this.options.productUrls, function(productId, url) {
-                if (currentUrl === url) {
+                if (currentBaseUrl === url) {
                     simpleProductId = productId;
                     return false;
                 }
@@ -1678,14 +1768,13 @@ define([
                 var associatedAttributes = productData[simpleProductId];
 
                 $.each(associatedAttributes, function(attributeId, optionId) {
-                    var swatchOption = $('[data-role=swatch-options] [data-attribute-id="' + attributeId + '"] [data-option-id="' + optionId + '"]');
+                    var swatchOption = $('[data-role=swatch-options] [data-attribute-id="' + attributeId + '"] div[data-option-id="' + optionId + '"]');
                     if (swatchOption.length) {
                         swatchOption.trigger('click');
-                    } else {
-                        var dropdown = $('select[attribute-id="' + attributeId + '"]');
-                        if (dropdown.length) {
-                            dropdown.val(optionId).trigger('change');
-                        }
+                    }
+                    var dropdown = $('[data-attribute-id="' + attributeId + '"] select.swatch-select');
+                    if (dropdown.length) {
+                        dropdown.val(optionId).trigger('change');
                     }
                 });
             }
