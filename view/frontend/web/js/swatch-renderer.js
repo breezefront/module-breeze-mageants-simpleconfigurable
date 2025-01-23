@@ -1759,6 +1759,8 @@ define([
 
             if (simpleProductId) {
                 this._selectDefaultProcutId(simpleProductId);
+                $('.product-info-main .product-info-price').show();
+                $(document).trigger('processEstimatedDateEvent', [simpleProductId]);
             }
         },
 
