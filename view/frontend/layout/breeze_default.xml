@@ -7,14 +7,6 @@
                 <argument name="bundles" xsi:type="array">
                     <item name="dynamic" xsi:type="array">
                         <item name="items" xsi:type="array">
-                            <item name="configurable" xsi:type="array">
-                                <item name="path" xsi:type="string">Mageants_SimpleConfigurable/js/configurable</item>
-
-                                <item name="enabled" xsi:type="helper" helper="Swissup\Breeze\Helper\Config::isEnabled">
-                                    <param name="path">simpleconfigurable_config/simpleconfigurable_settings/enable</param>
-                                </item>
-                            </item>
-
                             <item name="SCP_all_option_clickable" xsi:type="array">
                                 <item name="path" xsi:type="string">Mageants_SimpleConfigurable/js/all-option-clickable</item>
 
@@ -27,6 +19,18 @@
 
                     <item name="product-configurable" xsi:type="array">
                         <item name="items" xsi:type="array">
+                            <item name="configurable" xsi:type="array">
+                                <item name="path" xsi:type="string">Swissup_BreezeMageantsSimpleconfigurable/js/configurable</item>
+
+                                <item name="export" xsi:type="array">
+                                    <item name="configurable-export" xsi:type="string">Magento_ConfigurableProduct/js/configurable</item>
+                                </item>
+
+                                <item name="enabled" xsi:type="helper" helper="Swissup\Breeze\Helper\Config::isEnabled">
+                                    <param name="path">simpleconfigurable_config/simpleconfigurable_settings/enable</param>
+                                </item>
+                            </item>
+
                             <item name="Magento_Swatches/js/swatch-renderer" xsi:type="array">
                                 <item name="path" xsi:type="string">Swissup_BreezeMageantsSimpleconfigurable/js/swatch-renderer</item>
 
