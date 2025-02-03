@@ -1495,9 +1495,10 @@ define([
                     initialImages.map(({thumb, img, full, type, videoUrl}) => ({thumb, img, full, type, videoUrl}))
                 );
 
-                if (this.options.gallerySwitchStrategy === 'prepend' && !isInitial) {
-                    imagesToUpdate = imagesToUpdate.concat(initialImages);
-                }
+                // Breeze: commented to replace images instead of prepend
+                // if (this.options.gallerySwitchStrategy === 'prepend' && !isInitial) {
+                //     imagesToUpdate = imagesToUpdate.concat(initialImages);
+                // }
 
                 imagesToUpdate = this._setImageIndex(imagesToUpdate);
 
